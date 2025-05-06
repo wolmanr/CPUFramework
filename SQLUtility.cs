@@ -14,7 +14,7 @@ namespace CPUFramework
 {
     public class SQLUtility
     {
-        public static string connectionstring = "Server=.\\\\SqlExpress;Database=RecordKeeperDB;Trusted_Connection=true\";";
+        public static string connectionstring = "Server=.\\SQLExpress;Database=RecipeDB;Trusted_Connection=true;TrustServerCertificate=True";
         public  static DataTable GetDataTable(string sqlstatement)
         {
             Debug.Print(sqlstatement);
