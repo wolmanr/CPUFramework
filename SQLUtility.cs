@@ -14,7 +14,7 @@ namespace CPUFramework
 {
     public class SQLUtility
     {
-        public static string connectionstring = "Server=.\\SQLExpress;Database=RecordKeeperDB;Trusted_Connection=true;TrustServerCertificate=True";
+        public static string connectionstring = "";
         public  static DataTable GetDataTable(string sqlstatement)
         {
             Debug.Print(sqlstatement);
@@ -27,7 +27,27 @@ namespace CPUFramework
             cmd.CommandText = sqlstatement;
             var dr = cmd.ExecuteReader();
             dt.Load(dr);
+            SetAllColumnAllowNull(dt);
             return dt;
+        }
+
+        private  static void SetAllColumnAllowNull(DataTable dt)
+        {
+            foreach(DataColumn c in dt.Columns)
+            {
+                c.AllowDBNull = true;
+            }
+        }
+
+        public static void DebugPrintDataTable(DataTable dt)
+        {
+            foreach(DataRow r in dt.Rows)
+            {
+                foreach(DataColumn c in dt.Columns)
+                {
+                    Debug.Print(c.ColumnName + " = " + r[c.ColumnName].ToString());
+                }
+            }
         }
     }
 }
