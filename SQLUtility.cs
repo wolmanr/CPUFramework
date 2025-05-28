@@ -1,35 +1,33 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Data;
 using Microsoft.Data.SqlClient;
-using System;
-using System.Data.SqlClient;
 using System.Diagnostics;
+using System.IO;
+using System.Data.SqlClient;
+
 
 namespace CPUFramework
 {
     public class SQLUtility
     {
         public static string connectionstring = "";
-        public  static DataTable GetDataTable(string sqlstatement)
-        {
-            Debug.Print(sqlstatement);
-            DataTable dt = new();
-            SqlConnection conn = new();
-            conn.ConnectionString = connectionstring;
-            conn.Open();
-            var cmd = new SqlCommand();
-            cmd.Connection = conn;
-            cmd.CommandText = sqlstatement;
-            var dr = cmd.ExecuteReader();
-            dt.Load(dr);
-            SetAllColumnAllowNull(dt);
-            return dt;
+        public static DataTable GetDataTable(string sqlstatement) 
+        { 
+            Debug.Print(sqlstatement); 
+          DataTable dt = new(); 
+          SqlConnection conn = new(); 
+          conn.ConnectionString = connectionstring; 
+          conn.Open(); 
+          var cmd = new SqlCommand(); 
+          cmd.Connection = conn; 
+          cmd.CommandText = sqlstatement; 
+          var dr = cmd.ExecuteReader();
+          SetAllColumnAllowNull(dt);
+          dt.Load(dr); 
+         SetAllColumnAllowNull(dt); 
+         return dt; 
         }
+
+
 
         public static void ExecuteSQL(string sqlstatement)
         {
@@ -56,4 +54,3 @@ namespace CPUFramework
         }
     }
 }
-//note
