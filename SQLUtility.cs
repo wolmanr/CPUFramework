@@ -54,6 +54,16 @@ namespace CPUFramework
             GetDataTable(sqlstatement);
         }
 
+        public static void ExecuteSQL(SqlCommand cmd)
+        {
+            using (SqlConnection conn = new SqlConnection(SQLUtility.connectionstring))
+            {
+                cmd.Connection = conn;
+                conn.Open();
+                cmd.ExecuteNonQuery();
+            }
+        }
+
         private  static void SetAllColumnAllowNull(DataTable dt)
         {
             foreach(DataColumn c in dt.Columns)
