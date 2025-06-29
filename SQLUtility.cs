@@ -9,6 +9,7 @@ using Microsoft.Data.SqlClient;
 using System;
 using System.Data.SqlClient;
 using System.Diagnostics;
+using System.Reflection.Metadata.Ecma335;
 
 namespace CPUFramework
 {
@@ -31,14 +32,23 @@ namespace CPUFramework
 
         public static DataTable GetDataTable(SqlCommand cmd)
         {
-            Debug.Print("-----" + Environment.NewLine +  cmd.CommandText);
+            
             DataTable dt = new();
             using (SqlConnection conn = new SqlConnection(SQLUtility.connectionstring))
             {
                 cmd.Connection = conn;
                 conn.Open();
-                SqlDataReader dr = cmd.ExecuteReader();
-                dt.Load(dr);
+                Debug.Print(GetSql(cmd));
+                try
+                {
+                    SqlDataReader dr = cmd.ExecuteReader();
+                    dt.Load(dr);
+                }
+                catch(SqlException ex)
+                {
+                    string msg = ParseConstraintMsg(ex.Message);
+                    throw new Exception(msg);
+                }
             }
             SetAllColumnAllowNull(dt);
             return dt;
@@ -83,6 +93,46 @@ namespace CPUFramework
             }
         }
 
+        public static string GetSql(SqlCommand cmd)
+        {
+            string val = "";
+#if DEBUG
+            StringBuilder sb = new();
+            if(cmd.Connection != null)
+            {
+                sb.AppendLine($"--{cmd.Connection.DataSource}");
+                sb.AppendLine($"use {cmd.Connection.Database}");
+                sb.AppendLine("go");
+            }
+            if (cmd.CommandType == CommandType.StoredProcedure)
+            {
+                sb.AppendLine($"exec {cmd.CommandText}");
+                int paramcount = cmd.Parameters.Count -1;
+                int paramnum = 0;
+                string comma = ",";
+                foreach(SqlParameter p in cmd.Parameters)
+                {
+                    if (p.Direction != ParameterDirection.ReturnValue)
+                    {
+                        if (paramnum == paramcount)
+                        {
+                            comma = "";
+                        }
+                        sb.AppendLine($"{p.ParameterName} = {(p.Value == null ? "null" : p.Value.ToString())}{comma}");
+
+                    }
+                    paramnum++;
+                }
+            }
+            else
+            {
+                sb.AppendLine(cmd.CommandText);
+            }
+            val = sb.ToString();
+#endif
+            return val;
+        }
+
         public static int GetFirstColumnFirstRowValue(string sql)
         {
             int n = 0;
@@ -96,8 +146,43 @@ namespace CPUFramework
             }
             return n;
 
-
         }
+
+        private static string ParseConstraintMsg(string msg)
+        {
+            string origmsg = msg;
+            string prefix = "ck_";
+            string msg_end = "";
+            if (msg.Contains(prefix) == false)
+            {
+                if (msg.Contains("u_"))
+                {
+                    prefix = "u_";
+                    msg_end = "must be unique";
+                }
+                if (msg.Contains("f_"))
+                {
+                    prefix = "f_";
+                }
+            }
+;                if (msg.Contains(prefix))
+                {
+                msg = msg.Replace("\"", "'");
+                    int positon = prefix.Length;
+                    msg = msg.Substring(positon);
+                    positon = msg.IndexOf("\"");
+                    if (positon == -1)
+                    {
+                        msg = origmsg;
+                    }
+                    else
+                    {
+                        msg = msg.Substring(0, positon);
+                        msg = msg.Replace("_", " ");
+                    msg = msg + msg_end;
+                    }
+                }
+            return msg;
+            }       
     }
 }
-//note
