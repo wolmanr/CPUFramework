@@ -1,15 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
-using System.Security.Cryptography.X509Certificates;
+﻿using System.Data;
 using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
-using System;
-using System.Data.SqlClient;
 using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
 
 namespace CPUFramework
 {
