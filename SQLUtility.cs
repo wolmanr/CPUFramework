@@ -62,7 +62,19 @@ namespace CPUFramework
             {
                 cmd.Connection = conn;
                 conn.Open();
-                cmd.ExecuteNonQuery();
+                try
+                {
+                    cmd.ExecuteNonQuery();
+                }
+                catch (SqlException ex)
+                {
+                    string msg = ParseConstraintMsg(ex.Message);
+                    if (string.IsNullOrEmpty(msg))
+                    {
+                        msg = ex.Message;
+                    }
+                    throw new Exception(msg);
+                }
             }
         }
 
@@ -140,41 +152,59 @@ namespace CPUFramework
 
         }
 
+        public static string GetFirstRowFirstColumnValueAsString(string sql)
+        {
+            string s = "";
+            DataTable dt = SQLUtility.GetDataTable(sql);
+            if (dt.Rows.Count > 0 && dt.Columns.Count > 0)
+            {
+                if (dt.Rows[0][0] != DBNull.Value)
+                {
+                    s = dt.Rows[0][0].ToString();
+                }
+            }
+            return s;
+        }
+
         private static string ParseConstraintMsg(string msg)
         {
             string origmsg = msg;
-            string prefix = "ck_";
-            string msg_end = "";
-            if (msg.Contains(prefix) == false)
+            int firstQuote = msg.IndexOf('"');
+            int secondQuote = msg.IndexOf('"', firstQuote + 1);
+            if (firstQuote == -1 || secondQuote == -1)
             {
-                if (msg.Contains("u_"))
-                {
-                    prefix = "u_";
-                    msg_end = "must be unique";
-                }
-                if (msg.Contains("f_"))
-                {
-                    prefix = "f_";
-                }
+                return origmsg;
             }
-;                if (msg.Contains(prefix))
-                {
-                msg = msg.Replace("\"", "'");
-                    int positon = prefix.Length;
-                    msg = msg.Substring(positon);
-                    positon = msg.IndexOf("\"");
-                    if (positon == -1)
-                    {
-                        msg = origmsg;
-                    }
-                    else
-                    {
-                        msg = msg.Substring(0, positon);
-                        msg = msg.Replace("_", " ");
-                    msg = msg + msg_end;
-                    }
-                }
-            return msg;
-            }       
+            string constraintName = msg.Substring(firstQuote + 1, secondQuote - firstQuote - 1);
+            string prefix = "";
+            string msg_end = "";
+
+            if (constraintName.StartsWith("ck_"))
+            {
+                prefix = "ck_";
+            }
+            else if (constraintName.StartsWith("u_"))
+            {
+                prefix = "u_";
+                msg_end = " must be unique";
+            }
+            else if (constraintName.StartsWith("f_"))
+            {
+                prefix = "f_";
+                msg_end = " is interfering with the delete due to a foreign key constraint";
+            }
+            else if (constraintName.StartsWith("c_"))
+            {
+                prefix = "c_";
+            }
+            else
+            {
+                  return origmsg;
+            }
+            string parsed = constraintName.Substring(prefix.Length).Replace("_", " ") + msg_end;
+
+            return parsed;
+        }
+
     }
 }
