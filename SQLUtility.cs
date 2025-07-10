@@ -24,6 +24,11 @@ namespace CPUFramework
 
         public static DataTable GetDataTable(SqlCommand cmd)
         {
+            return DoExecuteSql(cmd, true);
+        }
+
+        private static DataTable DoExecuteSql(SqlCommand cmd, bool loadtable)
+        {
             
             DataTable dt = new();
             using (SqlConnection conn = new SqlConnection(SQLUtility.connectionstring))
@@ -34,12 +39,19 @@ namespace CPUFramework
                 try
                 {
                     SqlDataReader dr = cmd.ExecuteReader();
-                    dt.Load(dr);
+                    if (loadtable == true)
+                    {
+                        dt.Load(dr);
+                    }
                 }
                 catch(SqlException ex)
                 {
                     string msg = ParseConstraintMsg(ex.Message);
                     throw new Exception(msg);
+                }
+                catch (InvalidCastException ex)
+                {
+                    throw new Exception(cmd.CommandText + ":" + ex.Message, ex);
                 }
             }
             SetAllColumnAllowNull(dt);
@@ -48,7 +60,12 @@ namespace CPUFramework
         }
         public  static DataTable GetDataTable(string sqlstatement)
         {
-            return GetDataTable(new SqlCommand(sqlstatement));
+            return DoExecuteSql(new SqlCommand(sqlstatement), true);
+        }
+
+        public static void ExecuteSQL(SqlCommand cmd)
+        {
+            DoExecuteSql(cmd, false);
         }
 
         public static void ExecuteSQL(string sqlstatement)
@@ -56,27 +73,7 @@ namespace CPUFramework
             GetDataTable(sqlstatement);
         }
 
-        public static void ExecuteSQL(SqlCommand cmd)
-        {
-            using (SqlConnection conn = new SqlConnection(SQLUtility.connectionstring))
-            {
-                cmd.Connection = conn;
-                conn.Open();
-                try
-                {
-                    cmd.ExecuteNonQuery();
-                }
-                catch (SqlException ex)
-                {
-                    string msg = ParseConstraintMsg(ex.Message);
-                    if (string.IsNullOrEmpty(msg))
-                    {
-                        msg = ex.Message;
-                    }
-                    throw new Exception(msg);
-                }
-            }
-        }
+       
 
         private  static void SetAllColumnAllowNull(DataTable dt)
         {
@@ -166,44 +163,55 @@ namespace CPUFramework
             return s;
         }
 
+        public static void SetParamValue(SqlCommand cmd, string paramname, object value)
+        {
+            try
+            {
+                cmd.Parameters[paramname].Value = value;
+            }
+            catch(Exception ex)
+            {
+                throw new Exception(cmd.CommandText + ":" + ex.Message, ex);
+            }
+        }
+
         private static string ParseConstraintMsg(string msg)
         {
-            string origmsg = msg;
             int firstQuote = msg.IndexOf('"');
             int secondQuote = msg.IndexOf('"', firstQuote + 1);
             if (firstQuote == -1 || secondQuote == -1)
-            {
-                return origmsg;
-            }
+                return msg;
+
             string constraintName = msg.Substring(firstQuote + 1, secondQuote - firstQuote - 1);
-            string prefix = "";
-            string msg_end = "";
 
-            if (constraintName.StartsWith("ck_"))
+            if (constraintName.StartsWith("f_"))
             {
-                prefix = "ck_";
-            }
-            else if (constraintName.StartsWith("u_"))
-            {
-                prefix = "u_";
-                msg_end = " must be unique";
-            }
-            else if (constraintName.StartsWith("f_"))
-            {
-                prefix = "f_";
-                msg_end = " is interfering with the delete due to a foreign key constraint";
-            }
-            else if (constraintName.StartsWith("c_"))
-            {
-                prefix = "c_";
-            }
-            else
-            {
-                  return origmsg;
-            }
-            string parsed = constraintName.Substring(prefix.Length).Replace("_", " ") + msg_end;
+                int tableIndex = msg.IndexOf("table \"");
+                if (tableIndex == -1)
+                    return msg;
 
-            return parsed;
+                int startTableName = tableIndex + 7;
+                int endTableName = msg.IndexOf('"', startTableName);
+                if (endTableName == -1)
+                    return msg;
+
+                string relatedTable = msg.Substring(startTableName, endTableName - startTableName);
+
+                string[] msgParts = msg.Split(' ');
+                string childTable = "record";
+                for (int i = 0; i < msgParts.Length; i++)
+                {
+                    if (msgParts[i].Equals("constraint", StringComparison.OrdinalIgnoreCase) && i + 1 < msgParts.Length)
+                    {
+                        childTable = msgParts[i + 1].Trim('"');
+                        break;
+                    }
+                }
+
+                return $"Cannot delete {childTable} because it has a related {relatedTable} record";
+            }
+
+            return msg;
         }
 
     }
