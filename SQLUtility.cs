@@ -177,41 +177,21 @@ namespace CPUFramework
 
         private static string ParseConstraintMsg(string msg)
         {
-            int firstQuote = msg.IndexOf('"');
-            int secondQuote = msg.IndexOf('"', firstQuote + 1);
-            if (firstQuote == -1 || secondQuote == -1)
-                return msg;
-
-            string constraintName = msg.Substring(firstQuote + 1, secondQuote - firstQuote - 1);
-
-            if (constraintName.StartsWith("f_"))
+            if (msg.Contains("The delete statement conflicted with the reference constraint"))
             {
-                int tableIndex = msg.IndexOf("table \"");
-                if (tableIndex == -1)
-                    return msg;
+                int tableIndex = msg.IndexOf("table \"") + 7;
+                int endTableIndex = msg.IndexOf("\"", tableIndex);
+                string childTable = msg.Substring(tableIndex, endTableIndex - tableIndex);
 
-                int startTableName = tableIndex + 7;
-                int endTableName = msg.IndexOf('"', startTableName);
-                if (endTableName == -1)
-                    return msg;
-
-                string relatedTable = msg.Substring(startTableName, endTableName - startTableName);
-
-                string[] msgParts = msg.Split(' ');
-                string childTable = "record";
-                for (int i = 0; i < msgParts.Length; i++)
-                {
-                    if (msgParts[i].Equals("constraint", StringComparison.OrdinalIgnoreCase) && i + 1 < msgParts.Length)
-                    {
-                        childTable = msgParts[i + 1].Trim('"');
-                        break;
-                    }
-                }
-
-                return $"Cannot delete {childTable} because it has a related {relatedTable} record";
+                return $"Cannot delete the record because it has related records in {childTable}.";
             }
 
-            return msg;
+            if (msg.Contains("unique key constraint"))
+            {
+                return "This record must be unique. A duplicate value exists.";
+            }
+
+            return "An error occurred while processing your request. Please ensure data integrity.";
         }
 
     }
