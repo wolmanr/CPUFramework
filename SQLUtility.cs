@@ -2,6 +2,7 @@
 using System.Text;
 using Microsoft.Data.SqlClient;
 using System.Diagnostics;
+using System.Reflection.Metadata.Ecma335;
 
 namespace CPUFramework
 {
@@ -178,32 +179,45 @@ namespace CPUFramework
         public static string ParseConstraintMsg(string msg)
         {
             string orgmsg = msg;
-            int firstQuote = msg.IndexOf('"');
-            int secondQuote = msg.IndexOf('"', firstQuote + 1);
-
-            if (firstQuote == -1 || secondQuote == -1)
+            string prefix = "ck_";
+            string msgend = "";
+            if (prefix.Contains(prefix) == false)
             {
-                return orgmsg;
-            }
+                prefix = "u_";
+                msgend = "Must be unique";
 
-            string constraintName = msg.Substring(firstQuote + 1, secondQuote - firstQuote - 1);
-            string friendlyName = constraintName;
-
-            if (constraintName.StartsWith("ck_"))
-            {
-                friendlyName = constraintName.Replace("ck_", "Check ");
             }
-            else if (constraintName.StartsWith("u_") || constraintName.StartsWith("U_"))
+            else if (msg.Contains("f_"))
             {
-                friendlyName = constraintName.Replace("u_", "Unique ").Replace("U_", "Unique ");
+                prefix = "f_";
             }
-            else if (constraintName.StartsWith("f_"))
+            if (msg.Contains(prefix))
             {
-                friendlyName = constraintName.Replace("f_", "Foreign Key ");
+                msg = msg.Replace("\"", "'");
+                int pos = msg.IndexOf(prefix) + prefix.Length;
+                msg = msg.Substring(pos);
+                pos = msg.IndexOf("'");
+                if (pos == -1)
+                {
+                    msg = orgmsg;
+                }
+                else
+                {
+                    msg = msg.Substring(0, pos);
+                    msg = msg.Replace("_", " ");
+                    msg = msg + msgend;
+                }
+                if (prefix == "f_")
+                {
+                    var words = msg.Split(" ");
+                    if (words.Length > 1)
+                    {
+                        msg = $"Cannot delete {words[0]} because it has related {words[1]} record";
+                    }
+                }
             }
-
-            string friendlyMsg = msg.Replace(constraintName, friendlyName);
-            return friendlyMsg;
+            return msg;
         }
+        
     }
 }
