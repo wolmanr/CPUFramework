@@ -29,7 +29,7 @@ namespace CPUFramework
 
         private static DataTable DoExecuteSql(SqlCommand cmd, bool loadtable)
         {
-            
+
             DataTable dt = new();
             using (SqlConnection conn = new SqlConnection(SQLUtility.connectionstring))
             {
@@ -44,7 +44,7 @@ namespace CPUFramework
                         dt.Load(dr);
                     }
                 }
-                catch(SqlException ex)
+                catch (SqlException ex)
                 {
                     string msg = ParseConstraintMsg(ex.Message);
                     throw new Exception(msg);
@@ -58,7 +58,7 @@ namespace CPUFramework
             return dt;
 
         }
-        public  static DataTable GetDataTable(string sqlstatement)
+        public static DataTable GetDataTable(string sqlstatement)
         {
             return DoExecuteSql(new SqlCommand(sqlstatement), true);
         }
@@ -73,11 +73,11 @@ namespace CPUFramework
             GetDataTable(sqlstatement);
         }
 
-       
 
-        private  static void SetAllColumnAllowNull(DataTable dt)
+
+        private static void SetAllColumnAllowNull(DataTable dt)
         {
-            foreach(DataColumn c in dt.Columns)
+            foreach (DataColumn c in dt.Columns)
             {
                 c.AllowDBNull = true;
             }
@@ -85,9 +85,9 @@ namespace CPUFramework
 
         public static void DebugPrintDataTable(DataTable dt)
         {
-            foreach(DataRow r in dt.Rows)
+            foreach (DataRow r in dt.Rows)
             {
-                foreach(DataColumn c in dt.Columns)
+                foreach (DataColumn c in dt.Columns)
                 {
                     Debug.Print(c.ColumnName + " = " + r[c.ColumnName].ToString());
                 }
@@ -99,7 +99,7 @@ namespace CPUFramework
             string val = "";
 #if DEBUG
             StringBuilder sb = new();
-            if(cmd.Connection != null)
+            if (cmd.Connection != null)
             {
                 sb.AppendLine($"--{cmd.Connection.DataSource}");
                 sb.AppendLine($"use {cmd.Connection.Database}");
@@ -108,10 +108,10 @@ namespace CPUFramework
             if (cmd.CommandType == CommandType.StoredProcedure)
             {
                 sb.AppendLine($"exec {cmd.CommandText}");
-                int paramcount = cmd.Parameters.Count -1;
+                int paramcount = cmd.Parameters.Count - 1;
                 int paramnum = 0;
                 string comma = ",";
-                foreach(SqlParameter p in cmd.Parameters)
+                foreach (SqlParameter p in cmd.Parameters)
                 {
                     if (p.Direction != ParameterDirection.ReturnValue)
                     {
@@ -138,7 +138,7 @@ namespace CPUFramework
         {
             int n = 0;
             DataTable dt = GetDataTable(sql);
-            if(dt.Rows.Count > 0 && dt.Columns.Count > 0)
+            if (dt.Rows.Count > 0 && dt.Columns.Count > 0)
             {
                 if (dt.Rows[0][0] != DBNull.Value)
                 {
@@ -169,30 +169,41 @@ namespace CPUFramework
             {
                 cmd.Parameters[paramname].Value = value;
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 throw new Exception(cmd.CommandText + ":" + ex.Message, ex);
             }
         }
 
-        private static string ParseConstraintMsg(string msg)
+        public static string ParseConstraintMsg(string msg)
         {
-            if (msg.Contains("The delete statement conflicted with the reference constraint"))
-            {
-                int tableIndex = msg.IndexOf("table \"") + 7;
-                int endTableIndex = msg.IndexOf("\"", tableIndex);
-                string childTable = msg.Substring(tableIndex, endTableIndex - tableIndex);
+            string orgmsg = msg;
+            int firstQuote = msg.IndexOf('"');
+            int secondQuote = msg.IndexOf('"', firstQuote + 1);
 
-                return $"Cannot delete the record because it has related records in {childTable}.";
+            if (firstQuote == -1 || secondQuote == -1)
+            {
+                return orgmsg;
             }
 
-            if (msg.Contains("unique key constraint"))
+            string constraintName = msg.Substring(firstQuote + 1, secondQuote - firstQuote - 1);
+            string friendlyName = constraintName;
+
+            if (constraintName.StartsWith("ck_"))
             {
-                return "This record must be unique. A duplicate value exists.";
+                friendlyName = constraintName.Replace("ck_", "Check ");
+            }
+            else if (constraintName.StartsWith("u_") || constraintName.StartsWith("U_"))
+            {
+                friendlyName = constraintName.Replace("u_", "Unique ").Replace("U_", "Unique ");
+            }
+            else if (constraintName.StartsWith("f_"))
+            {
+                friendlyName = constraintName.Replace("f_", "Foreign Key ");
             }
 
-            return "An error occurred while processing your request. Please ensure data integrity.";
+            string friendlyMsg = msg.Replace(constraintName, friendlyName);
+            return friendlyMsg;
         }
-
     }
 }
