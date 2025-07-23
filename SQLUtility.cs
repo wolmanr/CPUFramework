@@ -63,38 +63,41 @@ namespace CPUFramework
 
         private static void CheckReturnValue(SqlCommand cmd)
         {
-                int returnvalue = 0;
-                string msg = "";
+            int returnValue = 0;
+            string msg = "";
+
             if (cmd.CommandType == CommandType.StoredProcedure)
             {
                 foreach (SqlParameter p in cmd.Parameters)
                 {
                     if (p.Direction == ParameterDirection.ReturnValue)
                     {
-                        if (p.Value != null)
+                        if (p.Value != null && p.Value != DBNull.Value)
                         {
-                            returnvalue = (int)p.Value;
+                            returnValue = Convert.ToInt32(p.Value);
                         }
                     }
-                    else if (p.ParameterName.ToLower() == "@message")
+                    else if (p.ParameterName.Equals("@message", StringComparison.OrdinalIgnoreCase) &&
+                             (p.Direction == ParameterDirection.Output || p.Direction == ParameterDirection.InputOutput))
                     {
-                        if (p.Value != null)
+                        if (p.Value != null && p.Value != DBNull.Value)
                         {
                             msg = p.Value.ToString();
                         }
                     }
-                    if (returnvalue == 1)
+                }
+
+                if (returnValue == 1)
+                {
+                    if (string.IsNullOrWhiteSpace(msg))
                     {
-                        if (msg == "")
-                        {
-                            msg = $"{cmd.CommandText} did not do action that was requested ";
-                        }
-                        throw new Exception(msg);
+                        msg = $"{cmd.CommandText} did not do action that was requested.";
                     }
+                    throw new Exception(msg);
                 }
             }
         }
-        
+
         public static DataTable GetDataTable(string sqlstatement)
         {
             return DoExecuteSql(new SqlCommand(sqlstatement), true);
@@ -215,41 +218,50 @@ namespace CPUFramework
         public static string ParseConstraintMsg(string msg)
         {
             string orgmsg = msg;
-            string prefix = "ck_";
+            string prefix = "";
             string msgend = "";
-            if (prefix.Contains(prefix) == false)
+
+            if (msg.Contains("ck_"))
+            {
+                prefix = "ck_";
+            }
+            else if (msg.Contains("u_") || msg.Contains("U_"))
             {
                 prefix = "u_";
-                msgend = "Must be unique";
-
+                msgend = " must be unique";
             }
             else if (msg.Contains("f_"))
             {
                 prefix = "f_";
             }
-            if (msg.Contains(prefix))
+            else
             {
-                msg = msg.Replace("\"", "'");
-                int pos = msg.IndexOf(prefix) + prefix.Length;
-                msg = msg.Substring(pos);
-                pos = msg.IndexOf("'");
-                if (pos == -1)
+                return orgmsg;
+            }
+
+            msg = msg.Replace("\"", "'");
+            int pos = msg.IndexOf(prefix);
+            if (pos == -1)
+            {
+                return orgmsg;
+            }
+
+            msg = msg.Substring(pos + prefix.Length);
+            int endpos = msg.IndexOf("'");
+            if (endpos == -1)
+            {
+                return orgmsg;
+            }
+
+            msg = msg.Substring(0, endpos);
+            msg = msg.Replace("_", " ") + msgend;
+
+            if (prefix == "f_")
+            {
+                var words = msg.Split(" ");
+                if (words.Length > 1)
                 {
-                    msg = orgmsg;
-                }
-                else
-                {
-                    msg = msg.Substring(0, pos);
-                    msg = msg.Replace("_", " ");
-                    msg = msg + msgend;
-                }
-                if (prefix == "f_")
-                {
-                    var words = msg.Split(" ");
-                    if (words.Length > 1)
-                    {
-                        msg = $"Cannot delete {words[0]} because it has related {words[1]} record";
-                    }
+                    msg = $"Cannot delete {words[0]} because it has related {words[1]} record";
                 }
             }
             return msg;
