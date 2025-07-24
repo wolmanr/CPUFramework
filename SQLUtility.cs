@@ -28,6 +28,39 @@ namespace CPUFramework
             return DoExecuteSql(cmd, true);
         }
 
+        public static void SaveDataRow(DataRow row, string sprocname)
+        {
+            SqlCommand cmd = GetSqlCommand(sprocname);
+            foreach (DataColumn col in row.Table.Columns)
+            {
+                string paramname = $"@{col.ColumnName}";
+                if (cmd.Parameters.Contains(paramname))
+                {
+                    cmd.Parameters[paramname].Value = row[col.ColumnName];
+                }
+            }
+            DoExecuteSql(cmd, false);
+
+            foreach (SqlParameter p in cmd.Parameters)
+            {
+                if ((p.Direction == ParameterDirection.InputOutput || p.Direction == ParameterDirection.Output) && p.ParameterName.StartsWith("@"))
+                {
+                    string colname = p.ParameterName.Substring(1);
+
+                    if (row.Table.Columns.Contains(colname))
+                    {
+                        var col = row.Table.Columns[colname];
+                        bool wasReadOnly = col.ReadOnly;
+                        col.ReadOnly = false;
+                        row[colname] = p.Value ?? DBNull.Value;
+                        col.ReadOnly = wasReadOnly;
+                    }
+                }
+            }
+        }
+        
+            
+
         private static DataTable DoExecuteSql(SqlCommand cmd, bool loadtable)
         {
 
